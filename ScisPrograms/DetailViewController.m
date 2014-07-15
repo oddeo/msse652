@@ -9,6 +9,7 @@
 #import "DetailViewController.h"
 #import "DescriptionViewController.h"
 
+//week 3 test
 @interface DetailViewController ()
 {
     NSMutableArray *courseTitleArray;
