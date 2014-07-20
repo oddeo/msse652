@@ -8,13 +8,14 @@
 
 #import "DetailViewController.h"
 #import "DescriptionViewController.h"
+#import "AFNetworking.h"
+#import "ProgramSvcAFNetworking.h"
+#import "Program.h"
 
-//week 3 test
 @interface DetailViewController ()
 {
     NSMutableArray *courseTitleArray;
-    NSArray *_jsonArray;
-    NSMutableData *_responseData;
+    ProgramSvcAFNetworking *pSvc;
 }
 @end
 
@@ -28,46 +29,22 @@
     return self;
 }
 
--(void)connection:(NSURLConnection *)connection didReceiveResponse:(NSURLResponse *)response
-{
-    _responseData = [[NSMutableData alloc] init];
-}
-
--(void)connection:(NSURLConnection *)connection didReceiveData:(NSData *)data
-{
-    [_responseData appendData:data];
-}
-
--(NSCachedURLResponse *)connection:(NSURLConnection *)connection willCacheResponse:(NSCachedURLResponse *)cachedResponse
-{
-    return nil; //returning nil indicates caching the response is not needed
-}
-
--(void)connectionDidFinishLoading:(NSURLConnection *)connection
-{
-    
-    // populate a json array and delegate the parse task to the parseData helper method
-    NSError *error = nil;
-    _jsonArray = [NSJSONSerialization JSONObjectWithData:_responseData
-                                                 options:kNilOptions
-                                                   error:&error];
-    [self parseData];
-    self.navbar.title = self.titleContents;
-    [_coursesTableView reloadData];
-    
-}
-
--(void)connection:(NSURLConnection *)connection didFailWithError:(NSError *)error
-{
-    NSLog(@"error: %@", error);
-}
-
 - (void)viewDidLoad
 {
     [super viewDidLoad];
-    [self initializeData];
+    
+    // initialize program service
+    pSvc = [[ProgramSvcAFNetworking alloc]init];
+    self.navbar.title = self.titleContents;
     self.coursesTableView.delegate = self;
     self.coursesTableView.dataSource = self;
+    
+    // create delegate to listen for the event that fires when the data is loaded in the service
+    [[NSNotificationCenter defaultCenter] removeObserver:self name:@"updateLeftTable"
+                                                  object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(checkRes:) name:@"updateLeftTable" object:nil];
+
 }
 
 -(NSInteger)numberOfSectionsInTableView:(UITableView *)tableView
@@ -77,7 +54,8 @@
 
 -(NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section
 {
-    return [courseTitleArray count];
+    return [pSvc retrieveAllPrograms].count;
+    
 }
 
 -(UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath
@@ -86,7 +64,8 @@
     UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:cellIdentifier
                                                             forIndexPath:indexPath];
     
-    cell.textLabel.text = [courseTitleArray objectAtIndex:indexPath.row];
+    NSMutableArray *courses = [pSvc retrieveAllPrograms];
+    cell.textLabel.text = ((Program *)[courses objectAtIndex:indexPath.row]).name;
     
     return cell;
 }
@@ -99,8 +78,9 @@
         NSIndexPath *indexpath = nil;
         NSString *courseTitleString = nil;
         
+        NSMutableArray *courses = [pSvc retrieveAllPrograms];
         indexpath = [_coursesTableView indexPathForSelectedRow];
-        courseTitleString = [courseTitleArray objectAtIndex:indexpath.row];
+        courseTitleString = ((Program *)[courses objectAtIndex:indexpath.row]).name;
         
         [[segue destinationViewController] setCourseTitleContents: courseTitleString];
     }
@@ -113,40 +93,16 @@
     // Dispose of any resources that can be recreated.
 }
 
-#pragma mark - Helper Methods ****************
-- (void) initializeData
+//the event that fires when the data is loaded in the service (reloads table view)
+-(void)checkRes:(NSNotification *)notification
 {
-    
-    NSURL *url = [NSURL URLWithString:@"http://regisscis.net/Regis2/webresources/regis2.program"];
-    
-    NSMutableURLRequest *request = [[NSMutableURLRequest alloc] initWithURL:url];
-    [request setValue:@"application/json"
-   forHTTPHeaderField:@"Accept"];
-    [request setHTTPMethod:@"GET"];
-    
-    NSURLConnection *conn = [[NSURLConnection alloc] initWithRequest:request
-                                                            delegate:self];
-    NSLog(@"Connected to: %@", conn);
-    
+    if ([[notification name] isEqualToString:@"updateLeftTable"])
+    {
+        [_coursesTableView reloadData];
+    }
 }
 
-- (void) parseData
-{
-    
-  // populate the array that feeds the table view
-  courseTitleArray = [NSMutableArray array];
-    
-  for (int i=0; i<_jsonArray.count; i++) {
-    NSDictionary *pgm = _jsonArray[i];
-    for (id key in pgm) {
-      if([key  isEqual: @"name"]) {
-        id value = [pgm objectForKey:key];
-        [courseTitleArray addObject: value];
-      }
-    }
-  }
-    
-}
+
 
 
 
